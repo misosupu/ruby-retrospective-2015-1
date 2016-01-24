@@ -1,4 +1,4 @@
-SUITS = [:spades, :hearts, :diamonds, :clubs]
+SUITS = [:clubs, :diamonds, :hearts, :spades]
 
 class Card
   attr_accessor :rank, :suit
@@ -10,6 +10,10 @@ class Card
 
   def to_s
     "#{@rank.to_s.capitalize} of #{@suit.capitalize}"
+  end
+
+  def ==(other)
+    @rank == other.rank && @suit == other.suit
   end
 
   def queen?
@@ -26,9 +30,7 @@ class GenericDeck
   RANKS = []
 
   def generate_deck
-    deck = self.class::RANKS.product(SUITS).map! do |rank, suit|
-      Card.new(rank, suit)
-    end
+    self.class::RANKS.product(SUITS).map! { |rank, suit| Card.new(rank, suit) }
   end
 
   def initialize(deck = generate_deck)
@@ -40,19 +42,19 @@ class GenericDeck
   end
 
   def draw_top_card
-    @deck.pop
-  end
-
-  def draw_bottom_card
     @deck.shift
   end
 
+  def draw_bottom_card
+    @deck.pop
+  end
+
   def top_card
-    @deck.last
+    @deck.first
   end
 
   def bottom_card
-    @deck.first
+    @deck.last
   end
 
   def shuffle
@@ -90,22 +92,15 @@ class Hand
     @cards.select { |card| card.suit == suit }
   end
 
-  def has_card?(card_rank)
-    @cards.any? { |card| card.rank == card_rank }
-  end
-
   def king_and_queen?(suits)
-    suites.each do |suite|
-      current_suite = get_suite(suite)
-      if current_suite.any?(&:queen?) and current_suite.any?(&:king?)
-        return true
-      end
+    suits.any? do |suite|
+      current_suite = get_suit(suite)
+      current_suite.any?(&:queen?) && current_suite.any?(&:king?)
     end
-    false
   end
 
   def to_s
-    @cards.map { |card| card.to_s }.join("\n")
+    @cards.map(&:to_s).join("\n")
   end
 
   def size
@@ -114,6 +109,15 @@ class Hand
 
   def each(&block)
     @cards.each(&block)
+  end
+end
+
+class WarDeck < GenericDeck
+  RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, :jack, :queen, :king, :ace]
+  DEAL_SIZE = 26
+
+  def deal
+    WarHand.new(@deck.pop(DEAL_SIZE))
   end
 end
 
@@ -131,12 +135,12 @@ class WarHand < Hand
   end
 end
 
-class WarDeck < GenericDeck
-  RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, :jack, :queen, :king, :ace]
-  DEAL_SIZE = 26
+class BeloteDeck < GenericDeck
+  RANKS = [7, 8, 9, :jack, :queen, :king, 10, :ace]
+  DEAL_SIZE = 8
 
   def deal
-    WarHand.new(@deck.pop(DEAL_SIZE))
+    BeloteHand.new(self.class::RANKS, @deck.pop(DEAL_SIZE))
   end
 end
 
@@ -157,15 +161,12 @@ class BeloteHand < Hand
   end
 
   def identify_sequences(length)
-    SUITS.each do |suit|
+    SUITS.any? do |suit|
       current_suit = get_suit(suit).map! { |card| @ranks.index card.rank }.sort!
-      if current_suit.each_cons(length).any? do |list|
-        list == (list[0]..list[-1]).to_a
-        end
-        return true
+      current_suit.each_cons(length).any? do |list|
+        list == (list.first..list.last).to_a
       end
     end
-    false
   end
 
   def tierce?
@@ -181,7 +182,7 @@ class BeloteHand < Hand
   end
 
   def carre?(card_type)
-    @cards.select { |card| card.rank == card_type}.count == 4
+    @cards.count { |card| card.rank == card_type } == 4
   end
 
   def carre_of_jacks?
@@ -197,15 +198,14 @@ class BeloteHand < Hand
   end
 end
 
-class BeloteDeck < GenericDeck
-  RANKS = [7, 8, 9, :jack, :queen, :king, 10, :ace]
-  DEAL_SIZE = 8
+class SixtySixDeck < GenericDeck
+  RANKS = [9, :jack, :queen, :king, 10, :ace]
+  DEAL_SIZE = 6
 
   def deal
-    BeloteHand.new(self.class::RANKS, @deck.pop(DEAL_SIZE))
+    SixtySixHand.new(@deck.pop(DEAL_SIZE))
   end
 end
-
 
 class SixtySixHand < Hand
   def twenty?(trump_suit)
@@ -214,14 +214,5 @@ class SixtySixHand < Hand
 
   def forty?(trump_suit)
     king_and_queen?([trump_suit])
-  end
-end
-
-class SixtySixDeck < GenericDeck
-  RANKS = [9, :jack, :queen, :king, 10, :ace]
-  DEAL_SIZE = 6
-
-  def deal
-    SixtySixHand.new(@deck.pop(DEAL_SIZE))
   end
 end
